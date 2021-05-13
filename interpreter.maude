@@ -1,0 +1,1037 @@
+
+
+load datatypes
+
+view Aid from TRIV to DATA is
+   sort Elt to Aid .
+endv
+
+view GData from TRIV to DATA is
+   sort Elt to GData .
+endv
+
+view Expr from TRIV to DATA is
+   sort Elt to Expr .
+endv
+
+view Contract from TRIV to DATA is
+   sort Elt to Contract .
+endv
+
+view Pair from TRIV to DATA is
+   sort Elt to Pair .
+endv
+
+
+
+*** Bound variables ***
+fmod SUBST is
+*** protecting META-LEVEL .
+***protecting DATATYPES .
+protecting MAP{Aid, GData} * (sort Map{Aid, GData} to Subst,
+                             op empty : -> Map{Aid, GData} to noSub ) .
+
+
+***op noSub : -> Subst .
+*** eq noSub = (empty).Subst .
+
+op dom : Aid Subst -> Bool .
+op remove : Aid Subst -> Subst .
+
+*** Non-comm composition operator for substitutions
+op _#_ : Subst Subst -> Subst .
+vars A A' : Aid . var D : GData . vars S1 S2  : Subst .
+
+eq S1 # noSub = S1 .
+eq S1 # ((A |-> D), S2) = insert(A,D,S1) # S2 .
+
+eq dom(A, noSub) = false .
+eq dom(A, ((A' |-> D), S1)) = if A == A' then true else dom(A, S1) fi .
+eq dom(A, S1 # S2) = dom(A, S1) or dom(A, S2) .
+
+eq remove(A, (S1, A |-> D)) =  S1 .
+eq remove(A, S1) =  S1 [owise] .
+
+
+endfm
+
+
+
+
+fmod EVAL is
+protecting SUBST .
+protecting LIST {Expr} * (sort LIST{Expr} to list) .
+pr BOOL-OPS .
+
+*** Evaluation of expressions
+op eval	    : Expr Subst     -> GData .     *** evaluate expression
+op eval	    : EmpList Subst     -> GData .     *** evaluate expression
+op evalB    : Expr Subst     -> Bool .
+op evalN    : Expr Subst     -> Nat .
+op evalS    : Expr Subst     -> String .
+op evalList : ExprList Subst -> DataList . *** maps list to values
+op _+_      : GData GData -> GData .
+op inList   : GData DataList -> Bool .
+
+*** Variables
+var E E' : Expr .     var EL : ExprList .     var D D' : GData . var NsD NsD' : Data . var SD SD' : SenData .
+var A : Aid .         var S : Subst .         var Q : Qid .
+var I : Int .         var B : Bool .          var STR : String . var PL : PolicyId .
+var DL : DataList .
+
+eq eval(A, S) = S [A] .
+eq eval(D, S) = D .                                *** data
+eq sensitive( NsD, PL ) + NsD' = sensitive( (NsD app NsD'), PL ) .
+eq  NsD' + sensitive( NsD, PL ) = sensitive( NsD' app NsD, PL ) .
+eq  NsD + NsD' = NsD app NsD' .
+eq sensitive( NsD, PL ) + sensitive( NsD', PL ) = sensitive( NsD app NsD', PL ) .
+eq inList(D, emp) = false .
+eq inList(D, D') = D == D' .
+eq inList(D, (D',, DL)) = if (D == D') then true else inList(D, (DL)) fi .
+
+eq evalN(E,S) = eval(E,S) asNat .                  *** expressions
+eq evalB(E,S) = eval(E,S) asBool .                 *** expressions
+eq evalS(E,S) = eval(E,S) asStr .                  *** expressions
+eq eval (emp, S)= emp .
+
+
+*** standard evaluation of expression
+***eq eval(pair(E,E'),S) = pair(eval(E,S),eval(E',S)) . 
+***eq eval(EL , S)  = evalList(EL, S) .       
+***eq eval(setl(EL), S)  = setl(evalList(EL, S)) .   
+***eq eval(Q [[EL]], S)  = Q [[ evalList(EL, S) ]] .   
+
+*** lists  
+eq evalList(emp, S)   = eval(emp, S) .
+ eq evalList(E,,EL, S) = eval(E, S),, evalList(EL, S) .
+            
+*** eq evalList(E, S)   = eval(E, S) . *** not needed
+
+
+endfm
+
+
+
+
+fmod STATEMENTS is
+pr DATA .
+
+sorts Mid Cid Stm .             *** Mid = method identifiers
+subsort Qid < Mid Cid .         *** Cid = class identifiers
+
+op _._ (_)  : Expr Mid ExprList -> Stm [ctor] . *** remote call
+op _@_   : Qid  Cid -> Mid [ctor] .
+*** CREOL program syntax
+op skip : -> Stm [ctor] .
+op _::=_  : AidList Stm -> Stm [ctor] .  
+op _::=_  : AidList ExprList -> Stm [ctor] .       *** simple assignment
+op _::=_  : AidList Nat -> Stm [ctor] .       *** simple assignment
+op _::= new_(_) : Aid Cid ExprList -> Stm [ctor] . *** object creation
+op _(_) : Mid ExprList  -> Stm [ctor] .  *** sync. call
+op cont   : Nat              -> Stm [ctor] .       *** sync. scheduling
+op return : ExprList         -> Stm [ctor] .       *** method return
+op delete :  Aid         -> Stm [ctor] .       *** method return
+op free   : AidList          -> Stm [ctor] .       *** deallocation for labels
+op freeze   : Stm              -> Stm [ctor] .       *** sync. scheduling
+op _::=_? :  AidList Qid      -> Stm [ctor] . *** M?
+op policy : Bool Nat -> ExprList [ctor] .
+op cat(_) : MsgId -> Stm [ctor] .
+op collect : Data Aid Aid Aid -> Stm [ctor] .
+op logIn :  Data -> ExprList [ctor] .
+op logOut : ->  Stm  .
+op optIn   :  Aid Aid -> Stm [ctor] .
+op optOut   : Bool Aid Aid -> Stm [ctor] .
+op _._._ : Expr Mid ExprList -> Stm [ctor] .
+op return-check(_) : ExprList -> Stm [ctor] .
+op _::= contractt(_,_) : Aid Data Aid -> Stm [ctor] .
+op end : -> Stm .
+***op store(_,_) : Key Aid -> Stm [ctor] .
+***op store(_,_) : Key GData -> Stm [ctor] .
+op _:::=_  : AidList ExprList -> Stm [ctor] .       *** insert bind, completion message
+
+
+op _++_ : Expr Expr -> ExprList .
+
+
+
+endfm
+
+view Stm from TRIV to STATEMENTS is
+   sort Elt to Stm .
+endv
+
+fmod STM-LIST is
+pr STATEMENTS .
+pr SUBST .
+protecting LIST{Stm} * (sort List{Stm} to StmList,
+                        sort NeList{Stm} to NeStmList,
+                        op __ : List{Stm} List{Stm} -> List{Stm} to _;_ 
+) .
+protecting SET{Pair} * (sort NeSet{Pair} to NeScope,
+                            sort Set{Pair} to Scope) .
+op if-nothing(_){_}else{_} :  ExprList StmList StmList -> Stm [ctor] .			    
+op if-consent(_,_){_}else{_} : Aid Aid StmList StmList -> Stm [ctor] .
+op if-comply(_,_){_}else{_} : Aid ExprList StmList StmList -> Stm [ctor] .
+op retrieve(_,_){_}else{_} : Aid Aid StmList StmList -> Stm [ctor] .
+op store(_,_)else{_} : Key Aid StmList -> Stm [ctor] .
+***op collect(_,_,_,_)else{_} : Data Aid Aid Aid StmList -> Stm [ctor] .
+
+var SL : StmList .  *** note: SL matches also empty
+var NeSL : NeStmList .
+var EL : ExprList .
+var B : Expr .
+var V : Scope .
+var St : Stm .
+var A : Aid .
+ 
+
+eq (emp ::= EL)     = skip . *** Note that skip takes a step
+eq (A ::= emp)     = skip .
+
+sorts Process NeMProc MProc RunStat  .
+subsort Process < NeMProc < MProc .    *** Multiset of Processes
+***subsort Scope < SetPair .
+op noProc : -> MProc [ctor] .
+op _+_ : Process Stm -> Process .
+
+***op _++_ : NeMProc MProc -> NeMProc [ctor assoc comm id: noProc] .
+***op _++_ : MProc NeMProc -> NeMProc [ctor assoc comm id: noProc] .
+***op _++_ : MProc MProc   -> MProc   [ctor assoc comm id: noProc] .
+
+*** A Process is a pair of Prog and bound variables ***
+op _@_ : StmList Scope -> RunStat .
+op idle : -> Process [format (!b o)] .
+op error(_) : Contract -> Process [format (!b o o o o)] .
+op errorC(_) : Contract -> Process [format (!b o o o o)] .
+op errorU(_) : Contract -> Process [format (!b o o o o)] .
+op error :  -> Process [format (!b o)] . 
+op _,_ : Subst RunStat -> Process [ctor format (o r nb o)] . 
+var L : Subst .
+eq (L, (nil @ V)) = idle . *** if 'label is needed this is dangerous!
+eq ((L, SL @ V) + St) = (L, (SL ; St) @ V) .
+**** eq idle = (noSub, nil).  *** may use in right hand sides, but not left.
+
+endfm
+
+***fmod TRACE is
+***pr STM-LIST .
+***sorts Trace NeTrace .
+***subsort StmList < NeTrace < Trace  .
+***op noTrace : -> Trace [ctor] .
+***op _::_ : NeTrace Trace -> NeTrace [ctor assoc comm id: noTrace] .
+***op _::_ : Trace NeTrace -> NeTrace [ctor assoc comm id: noTrace] .
+***op _::_ : Trace Trace   -> Trace   [ctor assoc comm id: noTrace] .
+***op genTrace(_,_) : StmList StmList -> Trace .
+
+***var T T' : Trace . var NT NT' : NeTrace . var SL SL' : StmList . var D : GData . var A A' : Aid . var S : Stm .
+***eq genTrace(SL, ((optIn(A, A')) ; SL')) = genTrace((SL ; (optIn(true, A, A'))), SL') ::  genTrace((SL ; (optIn(false, A, A'))), SL') .
+***eq genTrace(SL, (S ; SL')) = genTrace((SL ; S), SL') .
+***eq genTrace(SL, nil) = SL .
+
+
+***endfm
+
+*** CREOL classes ***
+fmod CLASS is
+protecting STM-LIST .
+
+sorts    Class  Mtd MMtd Inh InhList . *** inheritance list
+subsorts Inh < Expr .  
+subsorts Inh < InhList .
+
+op  _<_> : Cid  ExprList -> Inh .     *** initialised superclass
+op noInh : -> InhList [ctor] .
+op  _##_   : InhList InhList -> InhList [ctor assoc id: noInh] .
+op str(_) : Cid -> Data .
+
+var Ih : Inh . 
+var IL : InhList .
+var S : Subst . 
+var SL : StmList . 
+vars Q Q' : Qid . 
+var MM : MMtd .
+var DL : DataList .
+var O : Oid .
+var N : Nat .
+var AL : AidList .
+var V : Scope .
+var Cn : Contract .
+
+eq  Ih ## IL ## Ih = Ih ## IL .
+
+op <_: Mtdname | Param:_, Latt:_, Code:_> : 
+    Qid AidList Subst StmList -> Mtd [ctor
+      format (g! g o o o g o o g o o g o g o)] .
+
+subsort Mtd < MMtd .    *** Multiset of methods
+
+op noMtd : -> Mtd [ctor] .
+op _*_  : MMtd MMtd -> MMtd [ctor assoc comm id: noMtd format (o o on o)] .
+
+
+
+op <_: Cl | Inh:_, Par:_, Att:_, Mtds:_, Ocnt:_> : 
+    Cid InhList AidList Subst MMtd Nat -> Class 
+   [format (b! b o o o b o o  b o o  b o o  b on o  b o  b! on )] .
+
+op emptyClass : -> Class .
+eq emptyClass = < 'noClass : Cl | Inh: noInh, Par: emp, Att: noSub, Mtds: noMtd, Ocnt: 0 > .
+
+*** Class/method functions ***
+op get : Qid MMtd Oid Nat DataList Contract  -> Process .  *** fetches pair (code, vars)
+op _in_ : Qid MMtd -> Bool .  *** checks if Q is a declared 
+                              *** method in the method multiset
+
+eq Q in noMtd = false .
+eq Q in (< Q' : Mtdname | Param: AL, Latt: S, Code: SL > * MM) = 
+     if (Q == Q') then true else (Q in MM) fi .
+
+*** bind call to process
+eq get(Q, noMtd, O, N, DL, Cn) = noProc . 
+eq get(Q, < Q' : Mtdname | Param: AL, Latt: S, Code: SL > * MM, O, N, DL, Cn) = 
+    if Q == Q' 
+    then (insert('caller, O, insert('cnCaller, Cn, S)), ((AL :::= DL) ; SL) @ empty)
+    else get(Q, MM, O, N, DL, Cn) fi .
+
+endfm
+
+***  objects ***
+fmod OBJECT is
+protecting CLASS .
+
+sort Object .
+
+op <_:_ | Att:_, Pr:_, Lcnt:_, Db:_> : 
+       Oid Cid Subst Process Nat Subst -> Object 
+         [ctor format (nr! r o o o  r o r  r o r  r o r o r r! no)] .
+
+
+op noObj : -> Object [ctor] .
+
+
+endfm
+
+fmod POLICY is protecting DATA .
+protecting SET{Contract} * (sort NeSet{Contract} to NeSetCn,
+                            sort Set{Contract} to SetCn) .
+sort Policy .
+
+op _<_, _, _, _, _> : PolicyId Data SetCn SetCn Bool Nat -> Policy [ctor  format (nr! rr   o o o o o o o o o r! no) ] .
+
+endfm
+
+*** CREOL messages and queues ***
+fmod COMMUNICATION is
+protecting OBJECT .
+protecting CONVERSION .
+pr POLICY .
+
+sort NatS . *** list of nats
+subsort Nat < NatS .
+
+sort Event Body Msg  MMsg Kid Queue History .
+subsort Body < MMsg .
+subsort Body < History .
+var H : History .
+
+op noMsg : -> Body [ctor] .
+op _+_ : MMsg MMsg -> MMsg [ctor assoc comm id: noMsg] .
+op noHis  : -> History .
+op noEvent  : -> Event .
+op assignEv :  -> Event .
+op assignEv1 : -> Event .
+op callEv :    -> Event .
+op returnEv :    -> Event .
+op collectEv :    -> Event .
+op tickEv : -> Event .
+op noOptInEv :   -> Event .
+op optInEv(_) :  PolicyId -> Event .
+op optOutEv(_) :  PolicyId -> Event .
+op deleteEv(_) : PolicyId -> Event .
+op storeEv : -> Event .
+op retrieveEv : -> Event .
+op otherEv : -> Event .
+op scopeCloseEv(_) : Scope -> Event .
+op scopeOpenEv(_) : Scope -> Event .
+***op errorEv(_,_) : Oid  Contract -> Event .
+op noObject  : -> Oid .
+op noPolicyId : -> PolicyId .
+op noContract : -> Contract .
+op noAid      : -> Aid .
+op ticking  : -> Oid .
+op _++_   : History History -> History .
+
+eq noHis ++ H = H .
+*** INVOCATION and REPLY
+op invoc(_,_,_,_,_) : Oid Nat Mid DataList Contract -> Body    *** invocation
+      [ctor format (!r o o o o o o o o o  o o o)] .  
+op comp(_,_) : Oid DataList  -> Msg                 *** completion
+      [ctor format (!r o o o o o  o)] .
+
+op n(_,_) : MsgId Process -> Msg                 *** completion
+      [ctor format (!r o o o o o o)] .
+
+op optInMsg(_,_,_) : Bool Contract PolicyId -> Body  [ctor format (!r o o o o o  o o o)] .
+op token(_,_) :  Contract PolicyId -> Msg  [ctor format (!r   o o o  o o o)] .
+op opt-out-user(_,_) :  Contract PolicyId -> Msg  [ctor format (!r   o o o  o o o)] .
+
+op optInMsg1(_,_) :  Contract PolicyId -> Body  [ctor format (!r o o o  o o o)] .
+op optInmsg(_,_,_) :  Contract PolicyId Oid -> Body  [ctor format (!r o o o o o  o o o)] .
+***op optedIn(_,_) :  Contract PolicyId -> Body  [ctor format (!r o o o o o o)] .
+***op optedOut(_,_) :  Contract PolicyId -> Body  [ctor format (!r o o o o o o)] .
+op optOutmsg(_,_,_) :  Contract PolicyId Oid -> Body  [ctor format (!r o o o o o o o o)] .
+op collectMsg(_,_) :  Aid Aid -> Body  [ctor format (!r o o o  o o o)] .
+op logInMsg(_) :  Data -> Body  [ctor format (!r o o o   o)] .
+op logOutMsg(_) :  Data -> Body  [ctor format (!r o o o   o)] .
+op policyMsg(_) :  Aid  -> Body  [ctor format (!r o   o o o)] .
+***op dbDel(_) :  PolicyId -> Body  [ctor format (!r o o o   o)] .
+op scope-close(_,_) : Scope Oid -> Body  [ctor format (!r  o o o o o  o)] .
+op scope-empty(_) : Oid  -> Body  [ctor format (!r o o o  o)] .
+op scope-open(_,_) : Scope Oid  -> Body  [ctor format (!r o o o o o o)] .
+op use(_,_,_)    : Oid GData Contract -> Body .
+
+
+op _to_ : Body Oid -> Msg [ctor format (o  ! o on)] .
+op _from_to_ : Body Oid Oid -> Msg [ctor format (o ! o ! o on)] .
+***op error(_)   : String -> Msg [ctor format (nnr r o! or onn)] .     *** error 
+op warning(_) : String -> Msg [ctor format (nnr! r! r! or onn)] .   *** warning 
+*** Method binding messages
+op bindMtd : Oid Oid Nat Qid DataList InhList Contract  -> Msg [ctor] . 
+*** Bind method request
+*** Given: caller callee method params (list of classes to look in)
+op boundMtd(_,_) : Oid Process -> Msg 
+    [ctor format (!r r o o o !r on)] . *** binding result
+*** CONSIDER the call O.Q(I). bindMtd(O,Q,I,C S). Try to find Q in
+*** class C or superclasses, then in S. boundMtd(O,Mt) is the result.
+
+
+var  C   : Cid . var A : Aid .	 var  Q    : Qid . var  N    : Nat . var S : String . var O : Oid .
+ op newId : Cid Nat -> Oid .
+eq newId(Q, N)  = ob(qid(string(Q) + string(N,10))) .
+ op policyId : Nat -> PolicyId .
+ eq policyId(N) = policy(N) .
+op newN : Nat Oid -> MsgId .
+ eq newN(N, O) = n(N, O ) .
+op key : Qid String -> Key .
+eq key(Q, S) = k(Q,  S) .
+
+op <_ | Log:_> : 
+       Oid History -> Object 
+         [ctor format (nr! r o o   r   r! no)] .
+
+
+endfm
+
+*** STATE CONFIGURATION ***
+fmod CONFIG is
+protecting OBJECT .
+protecting COMMUNICATION .
+protecting POLICY .
+
+sort NConfiguration Configuration  .
+
+subsorts Object Msg  Class Policy  < NConfiguration .
+***subsort NConfiguration < Configuration .
+op { _ } : NConfiguration -> Configuration .
+
+op noConf : -> NConfiguration [ctor ] .
+op __ : NConfiguration NConfiguration -> NConfiguration [ctor assoc comm id: noConf ] .
+op main {_,_}_ : Subst StmList NConfiguration -> Configuration .
+
+var C : Cid . var E : ExprList .  var SL : StmList . var L : Subst . var MC : NConfiguration .
+eq main { L, SL } MC = { < ob('main) : 'class | Att: ('this |-> ob('main) , 'purpose |-> str('main), 'myContract |-> contract( str('main), ob('main) ) ),
+                 Pr: (L, (SL @ empty)), Lcnt: 0, Db: noSub >  MC } .
+op ruleLabel(_,_) : Oid Event -> NConfiguration .
+***op tickHistory(_) : Event -> NConfiguration .
+***op exec(_) : Oid -> NConfiguration .
+***op userexec(_,_,_) : Aid Contract PolicyId  -> NConfiguration .
+***op userexecDel(_,_) : Aid  PolicyId  -> NConfiguration .
+endfm
+
+
+*** THE MACHINE ***
+mod INTERPRETER is
+pr CONFIG .
+pr EVAL .
+protecting CONVERSION .
+
+vars O O' O'' : Oid .      vars C C' : Cid .
+vars A A' A'' : Aid .      var AL : AidList .
+vars E E' : Expr .     vars EL  : ExprList .        var D D' U : GData . var DL : DataList .
+var ST : Stm .         vars SL SL' SL'' : StmList . vars SL1 SL2 : NeStmList .
+var P : Process .
+vars S S' L L' DB DB' : Subst .
+vars N F N' : Nat .
+vars I I' : InhList .
+var MS : MMtd .
+var NS : NatS .
+var MM : MMsg .
+var M : Mid .
+var Q : Qid .
+var MsgBody : Body .
+var B B' : Bool .
+var T : Nat .
+var PL PL' : PolicyId .
+var CnSet CnSet' : SetCn .
+vars Cn Cn' : Contract .
+var Cfg : Configuration .
+var NsD NsD' : Data .
+var SD  : SenData .
+var Ncfg Ncfg' : NConfiguration .
+var STRING : String .
+var K : Key . var MSG : Msg . var CLASS : Class . var POLICY : Policy . var H : History .
+var V V' : Scope .
+var Ev : Event .
+
+
+***op comply(_,_,_) : DataList Contract NConfiguration -> Bool .
+***op checkcomply(_,_,_) : Data Contract NConfiguration -> Bool .
+op comply(_,_,_,_) : DataList Contract Scope NConfiguration -> Bool .
+op check(_,_,_) : PolicyId Contract NConfiguration -> Bool .
+op deleteF(_,_) : PolicyId NConfiguration -> NConfiguration [ctor] .
+op tick : -> Msg .
+op delRequest(_) : PolicyId -> Msg .
+op match : Expr Expr  -> Bool .
+op deleteDATA : PolicyId Subst -> Subst .
+op dec(_)     : NConfiguration -> NConfiguration .
+op policyIn(_)   : DataList -> DataList .
+op cScope(_)  : Scope -> Stm .
+op existPolicy(_,_) : PolicyId NConfiguration -> Bool .
+
+eq comply((PL,, DL) , Cn  , V, Ncfg) = ((< PL ,, Cn > in V) or check(PL, Cn, Ncfg)) and comply(DL, Cn, V, Ncfg) .
+eq comply(emp, Cn, V , Ncfg) = true .
+eq check(PL , Cn , (PL <  U, CnSet', CnSet, B, T >) Ncfg) =  (Cn in union(CnSet', CnSet))  .
+eq check( PL , Cn,  Ncfg) =  false [owise] .
+
+***eq existPolicy(PL, noConf) = false .
+eq existPolicy(PL, Ncfg PL < U, CnSet', CnSet, B, T > ) = true .
+eq existPolicy(PL, Ncfg ) = false [owise] .
+
+eq policyIn((NsD ,, DL)) =  policyIn (DL) .
+eq policyIn((sensitive( NsD, PL ) ,, DL)) =  (PL ,, policyIn(DL)) .
+eq policyIn(emp) = emp .
+***eq policyIn(NsD, Cn) = empty .
+op pairs(_,_) : DataList Contract -> Scope .
+eq pairs((PL,, DL), Cn) = < PL,, Cn >, pairs(DL, Cn)  .
+
+
+ceq dec((PL < U, CnSet', CnSet, B, T >) Ncfg) = (PL < U, CnSet', CnSet, B, (T - 1) >) dec(Ncfg)
+if (T - 1) =/= 0 .
+
+ceq dec((PL < U, CnSet', CnSet, B, T >) Ncfg) =  dec(deleteF(PL, Ncfg)) 
+if (T - 1) == 0 .
+
+eq dec( Ncfg) =  Ncfg [owise] .
+
+eq deleteDATA(PL, ((A |-> sensitive( NsD, PL')), S))  =
+if PL == PL' then deleteDATA(PL, S) else
+((A |-> sensitive( NsD, PL' )), deleteDATA(PL, S)) fi .
+eq deleteDATA(PL, ((A |-> NsD), S)) =  ((A |-> NsD), deleteDATA(PL, S)) .
+eq deleteDATA(PL, noSub) = noSub .
+eq deleteF(PL,( < O : C | Att: S, Pr: P, Lcnt: N, Db: DB >  Ncfg))  =  < O : C | Att: S, Pr: P, Lcnt: N, Db: deleteDATA(PL, DB) > (deleteF(PL,  Ncfg)) .
+eq deleteF(PL, Ncfg) = Ncfg [owise] . 
+
+
+eq match(sensitive( NsD, PL ), sensitive( NsD', PL' )) =
+if PL == PL' then true else false
+fi .
+eq match( NsD, NsD' ) = true .
+eq match(sensitive( NsD, PL ),  NsD') = true .
+eq match( NsD, sensitive( NsD', PL' )) = true .
+
+op getPurpose(_,_) : Oid Oid ->  Msg .
+op purpose(_,_,_) : Oid Oid Data ->  Msg .
+
+rl [timestamp] :
+{  ruleLabel(O, Ev) Ncfg  } 
+=> 
+{ dec(ruleLabel(ticking, tickEv)  Ncfg )  } .
+
+
+rl [delete] :
+ { (PL < U, CnSet', CnSet, B, T >) ruleLabel(O, Ev) Ncfg  }
+=> 
+ {  deleteF(PL,  ruleLabel(User, deleteEv(PL)) Ncfg ) }  .
+
+
+*** multiple assignment
+eq < O : C | Att: S, Pr: (L,(((A,,A',,AL)::=(E,,E',,EL)); SL) @ V), Lcnt: N, Db: DB  >
+=  < O : C | Att: S, Pr: (L,((A ::= eval(E,(S # L))); 
+             (A',, AL ::= evalList(E',,EL,(S # L))); SL) @ V), Lcnt: N, Db: DB > .
+
+rl [contract] :
+< O : C | Att: S, Pr: (L,((A ::= contractt(D, A')) ; SL) @ V), Lcnt: N, Db: DB >
+ruleLabel(O', Ev)  
+=>
+< O : C | Att: S, Pr: (L,((A ::= (contract( D, eval(A', (S # L))))) ; SL) @ V), Lcnt: N, Db: DB >
+ruleLabel(O, otherEv)  .
+
+crl [collect] :
+ < O : C | Att: S, Pr: (L, ((collect(D, A', A'', A)) ; SL) @ V), Lcnt: N, Db: DB >  
+ (PL < U, CnSet', CnSet, B, T >)  ruleLabel(O', Ev)  
+ =>
+ < O : C | Att: S, Pr: (insert(A, sensitive(D, eval(A'', (S # L))), L ),  SL @ V), Lcnt: N, Db: DB > (PL < U, CnSet', CnSet, B, T >)  ruleLabel(O, collectEv) 
+if PL := eval(A'', (S # L)) /\ Cn := eval(A', (S # L)) /\  (dom('user, L) == true) /\  (Cn in union(CnSet, CnSet') or < PL,, Cn > in V )  .
+
+crl [error-collect] :
+{ < O : C | Att: S, Pr: (L, ((collect(D, A', A'', A)) ; SL) @ V), Lcnt: N, Db: DB >  
+  Ncfg  ruleLabel(O', Ev)  }
+ =>
+{  < O : C | Att: S, Pr: errorC(eval(A', (S # L))), Lcnt: N, Db: DB > Ncfg  ruleLabel(O, collectEv)  }
+if PL := eval(A'', (S # L)) /\ ((comply(eval(A'', (S # L)) , eval(A', (S # L)) , V, Ncfg) == false) or (dom('user, L) == false )) .
+
+crl [store] :
+ < O : C | Att: S, Pr: (L,((store(K, A') else {SL}) ; SL') @ V), Lcnt: N, Db: DB >
+(PL < U, CnSet', CnSet, B, T >) ruleLabel(O', Ev)  
+=>
+ < O : C | Att: S, Pr: (L, (SL' @ V)), Lcnt: N, Db: (insert(K, eval(A', (S # L)), DB)) >
+(PL < U, CnSet', CnSet, B, T >) ruleLabel(O, storeEv) 
+if sensitive(NsD, PL ) := (eval(A', (S # L))) /\ Cn :=  eval('myContract, S) /\ (Cn in union(CnSet, CnSet')) /\ (B == true)  .
+
+crl [no-store] :
+{ < O : C | Att: S, Pr: (L,((store(K, A') else {SL}) ; SL') @ V), Lcnt: N, Db: DB >
+Ncfg ruleLabel(O', Ev)  }
+=>
+{ < O : C | Att: S, Pr: (L, ((SL ; SL') @ V)), Lcnt: N, Db: DB >
+Ncfg  ruleLabel(O, storeEv)  }
+if sensitive( NsD, PL ) := (eval(A', (S # L))) /\ (comply(PL , eval('myContract, S) , empty, Ncfg) == false) .
+
+crl [store*] :
+ < O : C | Att: S, Pr: (L,((store(K, A') else {SL}) ; SL') @ V), Lcnt: N, Db: DB >
+  ruleLabel(O', Ev)
+=>
+< O : C | Att: S, Pr: (L, (SL' @ V)), Lcnt: N, Db: (insert(K, eval(A', (S # L)), DB)) >
+ ruleLabel(O, storeEv)
+if NsD := (eval(A', (S # L))) .
+
+crl [retrieve] :
+ < O : C | Att: S, Pr: (L,(( retrieve(K, A) { SL } else { SL' }) ; SL'') @ V), Lcnt: N, Db: DB >
+(PL < U, CnSet', CnSet, B, T >) ruleLabel(O', Ev) 
+=>
+ < O : C | Att: S, Pr: (insert(A, eval(K, DB) , L), ( SL ; SL'') @ V), Lcnt: N, Db: DB  >
+(PL < U, CnSet', CnSet, B, T >)  ruleLabel(O, retrieveEv)  
+if sensitive( NsD, PL ) := (eval(K, DB)) /\ Cn := eval('myContract, S) /\ (Cn in union(CnSet, CnSet')) .
+
+crl [no-retrieve] :
+{ < O : C | Att: S, Pr: (L,(( retrieve(K, A) { SL } else { SL' }) ; SL'') @ V), Lcnt: N, Db: DB >
+Ncfg ruleLabel(O', Ev) }
+=>
+{ < O : C | Att: S, Pr: (L, (SL' ; SL'') @ V), Lcnt: N, Db: DB  >
+Ncfg ruleLabel(O, retrieveEv) }
+if sensitive( NsD, PL ) := (eval(K, DB)) /\ (comply(PL , eval('myContract, S), empty, Ncfg) == false) .
+
+
+crl [no-retrieve] :
+ < O : C | Att: S, Pr: (L,(( retrieve(K, A) { SL } else { SL' }) ; SL'') @ V), Lcnt: N, Db: DB >
+  ruleLabel(O', Ev)
+=>
+ < O : C | Att: S, Pr: (L, ((SL' ; SL'') @ V)), Lcnt: N, Db: DB  >
+  ruleLabel(O, retrieveEv)
+if (dom(K, DB) == false) or (dom(A, L) == false)  .
+
+crl [op] :
+< O : C | Att: S, Pr: (L,((A ::= E ++ E') ; SL) @ V), Lcnt: N, Db: DB >
+ ruleLabel(O', Ev) 
+=>
+< O : C | Att: S, Pr: (L, ((A ::= eval(E, (S # L)) + eval(E', (S # L)) ) ; SL) @ V), Lcnt: N , Db: DB >
+ ruleLabel(O, otherEv)
+if match(eval(E, (S # L)), eval(E', (S # L))) == true .
+
+crl [op-error] :
+< O : C | Att: S, Pr: (L,((A ::= E ++ E') ; SL) @ V), Lcnt: N, Db: DB >
+ ruleLabel(O', Ev)
+=>
+< O : C | Att: S, Pr: error, Lcnt: N , Db: DB >
+  ruleLabel(O, otherEv)
+if match(eval(E, (S # L)), eval(E', (S # L))) == false .
+
+crl [assign-local] :
+ < O : C | Att: S, Pr: (L,((A ::= E); SL) @ V), Lcnt: N, Db: DB >
+(PL < U, CnSet', CnSet, B, T >) ruleLabel(O', Ev) 
+=>
+ < O : C | Att: S, Pr: (insert(A,eval(E,(S # L)), L), (SL @ V)), Lcnt: N , Db: DB >
+(PL < U, CnSet', CnSet, B, T >) ruleLabel(O, assignEv)  
+if sensitive( NsD, PL ) := (eval(E, (S # L))) /\ Cn := eval('myContract, S)  /\ (dom(A,L) == true) /\ (Cn in union(CnSet, CnSet') or < PL,, Cn > in V ) .
+
+crl [error-assign] :
+{ < O : C | Att: S, Pr: (L,((A ::= E); SL) @ V), Lcnt: N, Db: DB >
+Ncfg ruleLabel(O', Ev) }
+=>
+{ < O : C | Att: S, Pr: errorU(eval('myContract, S)), Lcnt: N, Db: DB >
+Ncfg ruleLabel(O, assignEv) }
+if sensitive( NsD, PL ) := (eval(E, (S # L))) /\ (dom(A,L) == true) /\ (comply(PL , eval('myContract, S) , V, Ncfg) == false) .
+
+crl [assign-local*] :
+ < O : C | Att: S, Pr: (L,((A ::= E); SL) @ V), Lcnt: N, Db: DB >
+  ruleLabel(O', Ev)
+=>  
+< O : C | Att: S, Pr: (insert(A,eval(E,(S # L)), L), (SL @ V)), Lcnt: N , Db: DB >
+ ruleLabel(O, assignEv1)
+if  NsD  := (eval(E, (S # L))) /\ (dom(A,L) == true)  .
+
+crl [assign-field] :
+ < O : C | Att: S, Pr: (L,((A ::= E); SL) @ V), Lcnt: N, Db: DB >
+  ruleLabel(O', Ev)
+=>   
+ < O : C | Att: (insert(A, eval(E, S), S)), Pr: (L, (SL @ V)) , Lcnt: N , Db: DB >
+  ruleLabel(O, assignEv1)
+if  NsD  := (eval(E, (S # L))) /\ (dom(A,S) == true)  .
+
+crl [assign-field-error] :
+ < O : C | Att: S, Pr: (L,((A ::= E); SL) @ V), Lcnt: N, Db: DB >
+  ruleLabel(O', Ev)
+=>   
+ < O : C | Att: S, Pr: errorU(eval('myContract, S)) , Lcnt: N , Db: DB >
+  ruleLabel(O, assignEv1)
+if sensitive( NsD, PL )  := (eval(E, (S # L))) /\ (dom(A,S) == true)  .
+
+
+****insert the binding in invocation message and completion message without checking
+eq < O : C | Att: S, Pr: (L,(((A,,A',,AL):::= (E,,E',,EL)); SL) @ V), Lcnt: N, Db: DB  >
+=  < O : C | Att: S, Pr: (L,(((A :::= eval(E,(S # L))); 
+             (A',, AL :::= evalList(E',,EL,(S # L))); SL)) @ V), Lcnt: N, Db: DB > .
+
+rl [assign2] :
+< O : C | Att: S, Pr: (L,((A :::= E); SL) @ V), Lcnt: N, Db: DB >
+ ruleLabel(O', Ev)
+=>
+if dom(A,L) then
+< O : C | Att: S, Pr: (insert(A,eval(E,(S # L)), L), SL @ V), Lcnt: N , Db: DB >
+ ruleLabel(O, otherEv)
+else
+< O : C | Att: insert(A,eval(E,(S # L)), S), Pr: (L, SL @ V), Lcnt: N, Db: DB >
+ ruleLabel(O, otherEv)
+fi .
+
+rl [policy-and-error-policy] :
+  < O : C | Att: S, Pr: (L, ((A ::= policy(B, T)) ; SL) @ V), Lcnt: N, Db: DB >
+   ruleLabel(O', Ev)
+  =>
+  if (dom('user, L) )  then
+  < O : C | Att: S, Pr: (L, ((A ::= policyId(N)) ; SL) @ V), Lcnt: (N + 1), Db: DB >
+   ruleLabel(O, otherEv)
+  (policyId(N)) <  eval('user, L),( insert( eval('myContract, S), contract(str('main),  ob('main))) ), empty, B, T > 
+  else
+  < O : C | Att: S, Pr: (error), Lcnt: N, Db: DB >
+   ruleLabel(O, otherEv)
+  fi .
+
+rl [close-scope] :
+< O : C | Att: S, Pr: (L, (cScope(V') ; SL) @ V), Lcnt: N, Db: DB >
+ ruleLabel(O', Ev)
+=>
+< O : C | Att: S, Pr: (L, ( SL @ (V \ V'))), Lcnt: N, Db: DB >
+ ruleLabel(O, scopeCloseEv(V'))
+(scope-close(V', O)  to Trace) .
+
+crl [if-consent] :
+ < O : C | Att: S, Pr: (L, ((if-consent(A, A') {SL} else {SL'}) ; SL'') @ V), Lcnt: N, Db: DB >  
+(PL < U, CnSet', CnSet, B, T >) ruleLabel(O', Ev) 
+  =>  
+ < O : C | Att: S, Pr: (L, (SL ; cScope(< PL ,, Cn >) ; SL'') @ union(V, (< PL ,, Cn >))), Lcnt: N, Db: DB >
+ ruleLabel(O, scopeOpenEv((< eval(A', (S # L)) ,, eval(A, (S # L)) >)))
+(scope-open((< eval(A', (S # L)) ,, eval(A, (S # L)) >), O)  to Trace)
+(PL < U, CnSet', CnSet, B, T >)
+ if Cn :=  eval(A, (S # L)) /\ PL :=  eval(A', (S # L)) /\ (Cn in union(CnSet', CnSet)) .
+
+crl [no-consent] :
+{ < O : C | Att: S, Pr: (L, ((if-consent(A, A') {SL} else {SL'}) ; SL'') @ V), Lcnt: N, Db: DB >  
+Ncfg  ruleLabel(O', Ev) }
+  =>  
+{  < O : C | Att: S, Pr: (L, (SL' ; SL'') @ V), Lcnt: N, Db: DB >
+  Ncfg ruleLabel(O, scopeOpenEv((< eval(A', (S # L)) ,, eval(A, (S # L)) >)))  }
+ if comply(eval(A', (S # L)) , eval(A, (S # L))  , empty, Ncfg) == false .
+
+
+crl [if-comply] :
+{ < O : C | Att: S, Pr: (L, ((if-comply(A, EL) {SL} else {SL'}) ; SL'') @ V), Lcnt: N, Db: DB > 
+ Ncfg  ruleLabel(O', Ev) }
+  =>
+{  < O : C | Att: S, Pr: (L, (SL ; cScope(pairs(policyIn(evalList(EL, (S # L))), eval(A, (S # L)))) ; SL'') @ union(V, pairs(policyIn(evalList(EL, (S # L))), eval(A, (S # L))))), Lcnt: N, Db: DB >
+ ruleLabel(O, scopeOpenEv(pairs(policyIn(evalList(EL, (S # L))), eval(A, (S # L))))) 
+(scope-open(pairs(policyIn(evalList(EL, (S # L))), eval(A, (S # L))), O)  to Trace)  Ncfg }
+if comply(policyIn(evalList(EL, (S # L))), eval(A, (S # L)) , empty, Ncfg  ) == true .
+
+crl [no-comply] :
+{ < O : C | Att: S, Pr: (L, ((if-comply(A, EL) {SL} else {SL'}) ; SL'') @ V), Lcnt: N, Db: DB > 
+ Ncfg  ruleLabel(O', Ev) }
+  =>
+{  < O : C | Att: S, Pr: (L, (SL' ; SL'') @ V), Lcnt: N, Db: DB > Ncfg
+ ruleLabel(O, scopeOpenEv(pairs(policyIn(evalList(EL, (S # L))), eval(A, (S # L))))) }
+if comply(policyIn(evalList(EL, (S # L))), eval(A, (S # L)) , empty, Ncfg  ) == false .
+
+
+
+
+rl [if-nothing] :
+< O : C | Att: S, Pr: (L, ((if-nothing( EL) {SL} else {SL'}) ; SL'') @ V), Lcnt: N, Db: DB >
+ ruleLabel(O', Ev)
+  =>
+  if isnothing(evalList(EL, (S # L))) then
+ < O : C | Att: S, Pr: (L, ((SL ; SL'') @ V)), Lcnt: N, Db: DB >
+  ruleLabel(O, otherEv)
+else
+ < O : C | Att: S, Pr: (L, ((SL' ; SL'') @ V)), Lcnt: N, Db: DB >
+  ruleLabel(O, otherEv)
+ fi .
+
+
+rl [log-in-And-error-log-in] :
+ < O : C | Att: S, Pr: (L, ((A ::= logIn(D)) ; SL) @ V), Lcnt: N, Db: DB >
+ ruleLabel(O', Ev)
+  =>
+  if (dom('user, L) == false  )  then
+   < O : C | Att: S, Pr: ((insert(A, D, (insert('user, D, L)))),  (SL @ V)), Lcnt: N, Db: DB >
+ruleLabel(O, otherEv)
+   else
+   < O : C | Att: S, Pr: (error), Lcnt: N, Db: DB >
+    ruleLabel(O, otherEv)
+ fi  .
+
+rl [log-out-And-error-log-out] :
+ < O : C | Att: S, Pr: (L, ( (logOut) ; SL @ V)), Lcnt: N, Db: DB >
+  ruleLabel(O', Ev)
+  =>
+  if (dom('user, L) == true )  then
+   < O : C | Att: S, Pr: ( (remove('user, L)),  (SL @ V)), Lcnt: N, Db: DB >
+ruleLabel(O, otherEv)
+   else
+   < O : C | Att: S, Pr: (error), Lcnt: N, Db: DB >
+   ruleLabel(O, otherEv)
+ fi  .
+
+crl [user-opt-in-noPolicy] :
+{  < O : C | Att: S, Pr: (L, ( optIn( A, A') ; SL) @ V), Lcnt: N, Db: DB > 
+  ruleLabel(O', Ev)  Ncfg }
+ =>
+{  < O : C | Att: S, Pr: (L,  SL @ V), Lcnt: N, Db: DB > 
+  ruleLabel(O, otherEv) Ncfg  }
+ if ( dom('user, L) == true) and (existPolicy(eval(A', (S # L)), Ncfg) == false) .
+
+
+crl [opt-in-error] :
+ < O : C | Att: S, Pr: (L, (( optIn( A, A')) ; SL) @ V), Lcnt: N, Db: DB > 
+  ruleLabel(O', Ev)
+ =>
+ < O : C | Att: S, Pr: error, Lcnt: N, Db: DB > 
+ ruleLabel(O, otherEv)
+ if ( dom('user, L) == false) .
+
+crl [user-opt-in] :
+ < O : C | Att: S, Pr: (L, (optIn( A, A') ; SL) @ V), Lcnt: N, Db: DB > (PL < U, CnSet', CnSet, B', T >)
+  ruleLabel(O', Ev)
+ =>
+ < O : C | Att: S, Pr: (L, (freeze( optIn( A, A')) ; SL) @ V), Lcnt: N, Db: DB > (PL < U, CnSet', CnSet, B', T >)
+ruleLabel(O, otherEv)
+ (optInMsg1(eval(A, (S # L)), eval(A', (S # L))) from O to User) 
+ if ( dom('user, L) == true) and (PL == eval(A', (S # L))) .
+
+
+rl [opt-out-user] :
+(PL < U, CnSet', (Cn, CnSet), B', T >)  ruleLabel(O', Ev) 
+=>
+(PL < U, CnSet', (CnSet), B', T >) ruleLabel(User, optOutEv( PL))  .
+
+
+rl [option-true] :
+< User | Log: H  > (optInMsg1(Cn, PL) from O to User)
+ruleLabel(O', Ev)
+=>
+< User | Log: (H ++ optInMsg(true, Cn, PL))  > (optInMsg(true, Cn, PL) from User to O)
+ ruleLabel(User, optInEv( PL)) .
+
+
+rl [option-false] :
+< User | Log: H  > (optInMsg1(Cn, PL) from O to User)
+ ruleLabel(O', Ev)
+=>
+< User | Log: (H ++ optInMsg(false, Cn, PL))  > (optInMsg(false, Cn, PL) from User to O)
+ruleLabel(User, noOptInEv) .
+
+
+
+ceq < O : C | Att: S, Pr: (L, ( freeze(optIn( A, A')) ; SL) @ V), Lcnt: N, Db: DB >  (PL < U, CnSet', CnSet, B', T >) (optInMsg(B, Cn, PL) from User to O)
+ =
+< O : C | Att: S, Pr: (L,  (SL @ V)), Lcnt: N, Db: DB >  PL < U, CnSet', (Cn, CnSet), B', T >
+if ((eval(A', (S # L)) == PL) and (B == true) and  (dom('user, L) == true)) .
+
+ceq < O : C | Att: S, Pr: (L, ( freeze(optIn( A, A')) ; SL) @ V), Lcnt: N, Db: DB >  (PL < U, CnSet', CnSet, B', T >) (optInMsg(B, Cn, PL) from User to O)
+ =
+< O : C | Att: S, Pr: (L,  (SL @ V)), Lcnt: N, Db: DB >  (PL < U,  CnSet', ( CnSet), B', T >)
+if ((eval(A', (S # L)) == PL) and (B == false) and  (dom('user, L) == true)) .
+
+ceq {   < O : C | Att: S, Pr: (L, (( freeze(optIn( A, A'))) ; SL) @ V), Lcnt: N, Db: DB > ( optInMsg(B, Cn, PL) from User to O) Ncfg  }
+ =
+{  < O : C | Att: S, Pr: (L,  (SL @ V)), Lcnt: N, Db: DB >  Ncfg }
+if ((existPolicy(PL, Ncfg) == false)  ) .
+
+
+*** skip
+rl [skip] :
+  < O : C | Att: S, Pr: (L, (skip ; SL) @ V), Lcnt: N, Db: DB >
+  ruleLabel(O', Ev)
+  =>
+  < O : C | Att: S, Pr: (L, (SL @ V)), Lcnt: N, Db: DB >
+  ruleLabel(O, otherEv) .
+
+
+*** OBJECT CREATION
+rl [new-object] :
+< O : C | Att: S,Pr: (L, ((A ::= new C' (EL)); SL) @ V), Lcnt: N, Db: DB >
+ruleLabel(O', Ev)
+< C' : Cl | Inh: I , Par: AL, Att: S' , Mtds: MS , Ocnt: F >
+=> 
+< O : C | Att: S, Pr: (L, ((A ::= newId(C', F)); SL) @ V), Lcnt: N, Db: DB >
+ruleLabel(O, otherEv)
+< C' : Cl | Inh: I , Par: AL, Att: S' , Mtds: MS , Ocnt: (F + 1) >
+< newId(C',F) : C' | Att: noSub, Pr: idle, Lcnt: 1, Db: noSub >
+findAttr(newId(C',F), I, (insert('purpose, str(C'), insert('myContract, contract(str(C'), newId(C',F)), S'))), 
+    (AL ::= evalList(EL, (S # L)))) .
+
+*** ATTRIBUTE inheritance with multiple inheritance
+*** CMC assumes that all attributes names are (globally) different
+op findAttr  : Oid InhList Subst StmList  -> Msg [ctor] . *** collect attributes
+op foundAttr : Oid Subst  StmList         -> Msg [ctor] . *** resulting Subst
+*** look in InhList, collect attributes in Subst, give result to Oid
+
+eq findAttr(O, noInh, S, SL)  *** collection completed.
+       = foundAttr(O, S, SL) .
+
+eq findAttr(O,((C < EL >) ## I),S, SL) 
+< C : Cl | Inh: I', Par: AL, Att: L, Mtds: MS, Ocnt: F >
+ = findAttr(O, I ## I',(L # S), SL ; (AL ::= EL)) 
+   < C : Cl | Inh: I', Par: AL, Att: L, Mtds: MS, Ocnt: F > .
+
+eq foundAttr(O, S', SL) 
+< O : C | Att: S, Pr: idle, Lcnt: N, Db: DB >
+ = < O : C | Att: ('this |-> O, S'), Pr: (noSub, (SL @ empty)), Lcnt: N, Db: DB > .
+
+
+
+*** M?
+rl [get-data] :
+< O : C | Att: S, Pr: (L, ((AL ::= M ?) ; SL) @ V),  Lcnt: F, Db: DB >
+ruleLabel(O', Ev)
+ comp(O, DL) 
+=>
+< O : C | Att: S,  Pr: (L, ((AL :::= DL) ; SL) @ V) , Lcnt: F, Db: DB >
+ruleLabel(O, otherEv) .
+
+
+*** METHOD CALLS ***
+
+
+*** receive invocation message ***
+rl [receive-call-req] :
+< O : C | Att: S, Pr: P, Lcnt: N, Db: DB >
+ruleLabel(O', Ev)
+(invoc(O', F, Q, DL, Cn) from O' to O ) 
+=>
+< O : C | Att: S, Pr: P, Lcnt: N, Db: DB >
+ruleLabel(O, otherEv)
+ bindMtd(O, O', F, Q, DL, C < emp >,  Cn) .
+
+
+crl [self-call] : 
+{ < O : C | Att: S, Pr: (L, (( AL ::= E . M(EL)); SL) @ V), Lcnt: N, Db: DB >
+Ncfg ruleLabel(O', Ev) }
+=>
+if comply(policyIn(evalList(EL, (S # L))), eval('myContract, S) , V, Ncfg) then
+{ < O : C | Att: S, Pr: (L, ((AL ::= M ?) ; SL) @ empty), Lcnt: N, Db: DB  > bindMtd(O, O, N, M, evalList(EL, (S # L)), C < emp >,  eval('myContract, S) ) (scope-empty(O)  to Trace)
+Ncfg ruleLabel(O, callEv) }
+else
+{ < O : C | Att: S, Pr: errorU(eval('myContract, S)), Lcnt: N, Db: DB  > 
+Ncfg ruleLabel(O, callEv) }
+fi
+if (eval(E, (S # L)) == O) .
+
+rl [self-call-bound] : 
+boundMtd(O, P) < O : C | Att: S, Pr: (L, ((AL ::= M ?) ; SL) @ V) , Lcnt: N, Db: DB >
+ruleLabel(O', Ev)
+=>
+< O : C | Att: S, Pr: (P + cat(newN(N, O))), Lcnt: (N + 1), Db: DB >
+ruleLabel(O, otherEv)
+n(newN(N, O), (L, ((AL ::= M ?) ; SL ) @ V))  .
+
+
+eq bindMtd(O, O', N, Q, DL,(C < EL >)## I', Cn) 
+< C : Cl | Inh: I , Par: AL, Att: S , Mtds: MS , Ocnt: F >
+   =  if (Q in MS) then boundMtd(O,get(Q,MS,O', N, DL, Cn)) 
+                   else bindMtd(O,O',N,Q, DL, I ## I', Cn) fi 
+< C : Cl | Inh: I , Par: AL, Att: S , Mtds: MS , Ocnt: F > .
+
+
+
+
+rl [receive-call-bound] : 
+boundMtd(O, P) < O : C | Att: S, Pr: idle, Lcnt: N, Db: DB >
+ruleLabel(O', Ev)
+=> < O : C | Att: S, Pr: P, Lcnt: N, Db: DB > ruleLabel(O, otherEv) .
+
+crl [call-error] : 
+{  < O : C | Att: S, Pr: (L, (( AL ::= E . M(EL)); SL) @ V), Lcnt: N, Db: DB > < O' : C' | Att: S', Pr: P, Lcnt: N', Db: DB' > Ncfg ruleLabel(O'', Ev) }
+=>
+{   < O : C | Att: S, Pr: errorU(eval('myContract, S')), Lcnt: N, Db: DB   > < O' : C' | Att: S', Pr: P, Lcnt: N', Db: DB' >  Ncfg ruleLabel(O, callEv) }
+if (eval(E, (S # L)) == O') and ( comply(policyIn(evalList(EL, (S # L))), eval('myContract, S'), V, Ncfg) == false) .
+
+crl [call-1] : 
+{  < O : C | Att: S, Pr: (L, (( AL ::= E . M(EL)); SL) @ V), Lcnt: N, Db: DB > < O' : C' | Att: S', Pr: P, Lcnt: N', Db: DB' > Ncfg ruleLabel(O'', Ev)  }
+=>
+{  < O : C | Att: S, Pr: (L, ((AL ::=  M ?); SL) @ empty), Lcnt: N + 1 , Db: DB  > < O' : C' | Att: S', Pr: P, Lcnt: N', Db: DB' > (scope-empty(O) to Trace)
+(invoc(O, N, M , evalList(EL, (S # L)),  eval('myContract, S))  from O to O')  Ncfg ruleLabel(O, callEv)  }
+ if (eval(E, (S # L)) == O') and ( comply(policyIn(evalList(EL, (S # L))), eval('myContract, S'), V, Ncfg) == true) .
+
+
+rl [return-error-return] :
+{  < O : C |  Att: S, Pr: (L, (return(EL); SL) @ V), Lcnt: N, Db: DB >
+Ncfg ruleLabel(O', Ev) }
+=>
+if comply(policyIn(evalList(EL, (S # L))), eval('cnCaller, L), V, Ncfg) then
+{ < O : C |  Att: S, Pr: (L, (SL @ empty)), Lcnt: N, Db: DB > (scope-empty(O) to Trace)
+comp(eval('caller, L), evalList(EL, (S # L))) Ncfg ruleLabel(O, returnEv) } else
+{ < O : C |  Att: S, Pr: errorU(eval('cnCaller, L)), Lcnt: N, Db: DB > Ncfg  ruleLabel(O, returnEv) } fi .
+
+
+eq
+< Trace | Log: H  > optOutmsg(Cn, PL, O)  to Trace
+=
+< Trace | Log: H ++ optOutmsg( Cn, PL, O)  >  .
+
+eq
+< Trace | Log: H  > logInMsg(D) from O to Trace
+=
+< Trace | Log: H ++ logInMsg( D)  >  .
+
+eq
+< Trace | Log: H  > logOutMsg(D) from O to Trace
+=
+< Trace | Log: H ++ logOutMsg(D)  >  .
+
+eq
+< Trace | Log: H  > collectMsg(A, A') from O to Trace
+=
+< Trace | Log: H ++ collectMsg( A, A')  >  .
+
+eq
+< Trace | Log: H  > policyMsg(A) from O to Trace
+=
+< Trace | Log: H ++ policyMsg( A)  >  .
+
+
+eq
+< Trace | Log: H  > scope-open(V, O)  to Trace
+=
+< Trace | Log: H ++ scope-open(V, O)  >  .
+
+eq
+< Trace | Log: H  > scope-empty(O) to Trace
+=
+< Trace | Log: H ++ scope-empty(O)  >  .
+
+eq
+< Trace | Log: H  > scope-close(V, O)  to Trace
+=
+< Trace | Log: H ++ scope-close(V, O)  >  .
+
+endm
+

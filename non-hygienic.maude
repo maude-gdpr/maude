@@ -1,0 +1,66 @@
+
+mod PROGRAM is
+pr INTERPRETER .
+
+op init : -> Configuration  . 
+
+ eq init =
+ main {
+      ('r |-> null, 'mm |-> null, 'p |-> null, 'contract1 |-> null, 'contract2 |-> null, 'credit |-> null, 'mail |-> null, 'order |-> null, 'mmMarketingDone |-> null  ),
+      ( 'r ::= new 'Register('this)) ;
+      ('mm ::= new 'MassMarketing('this));
+      ('p ::= new 'Purchase('this)) ;
+      ('contract1 ::= contractt(str('Purchase), 'p)) ;
+      ('contract2 ::= contractt(str('MassMarketing), 'mm)) ;
+      (('u ,, 'policy1 ,, 'policy2 ) ::= 'r . 'register(('contract1,, 'contract2))) ;
+      (if-consent('contract1, 'policy1) { ('credit ::= 'r . 'getCredit('u)) } else { skip }) ;
+      (if-consent('contract1, 'policy2) { ('mail ::= 'r . 'getMail('u))  } else { skip })  ;
+      (if-nothing('credit,, 'mail){ skip }
+      else{
+      (if-comply('contract1, ('mail,, 'credit)){   ('order ::= 'p . 'purchase('credit,, 'mail))  } else { skip } ) ;
+      ('mmMarketingDone ::= 'mm . 'mMarketing('mail))
+}) ; end
+       }
+(ruleLabel(noObject, noEvent)
+< User | Log: noHis  >
+< Trace | Log: noHis  >
+< 'Register : Cl | Inh: noInh, Par: noAid,
+   Att: (noSub), 
+Mtds:
+< 'register : Mtdname | Param: ('contract1,, 'contract2), Latt: ( 'policy1 |-> null, 'policy2 |-> null, 'contract1 |-> null, 'contract2 |-> null, 'credit |-> null, 'mail |-> null ), Code:
+           ('user ::= logIn(str('u))) ;
+	   ('policy1 ::= policy(true, 2)) ;
+	   ('policy2 ::= policy(true, 2)) ;
+	   (optIn( 'contract1, 'policy1)) ;
+	   (optIn( 'contract1, 'policy2)) ;
+	   (optIn( 'contract2, 'policy2)) ;
+	    (  collect(int(1), 'contract1, 'policy1, 'credit)) ; (store(key('u, "credit"), 'credit) else { skip }) ;
+	   (if-consent('contract1, 'policy2) { (  collect(str('mail), 'contract1, 'policy2, 'mail)) ;  (store(key('u, "mail"), 'mail)  else { skip }) } else {skip }) ;
+           (return('user,, 'policy1,, 'policy2));
+           (logOut) > *
+ < 'getCredit : Mtdname | Param: ('u), Latt: ( 'credit |-> null), Code:  ( (retrieve(key('u, "credit"), 'credit) {(if-comply('cnCaller, 'credit)
+{ return('credit)} else{ return(nothing) }) } else { return(nothing) }))   > *
+ < 'getMail : Mtdname | Param: ('u), Latt: ( 'mail |-> null), Code:  ((retrieve(key('u, "mail"), 'mail) { (if-comply('cnCaller, 'mail)
+{ return('mail)} else{return(nothing) })}  else {return(nothing) }))  > ,
+Ocnt: 0 > 
+
+
+
+< 'Purchase : Cl | Inh: noInh, Par: noAid,
+   Att: noSub, 
+Mtds:
+< 'purchase : Mtdname | Param: ('credit,, 'mail), Latt: ('credit |-> null, 'order |-> null, 'mail |-> null), 
+            Code: (('order ::= bool(true)) ;( return('order)) ) 
+	     > ,
+Ocnt: 0 > 
+
+
+< 'MassMarketing : Cl | Inh: noInh, Par: noAid,
+   Att: noSub, 
+Mtds:
+< 'mMarketing : Mtdname | Param: ('mail), Latt: ('mail |-> null, 'mmMarketingDone |-> null), 
+            Code:  (('mmMarketingDone ::= bool(true)) ;  (return('mmMarketingDone))) > ,
+Ocnt: 0 > ) . 
+
+
+endm

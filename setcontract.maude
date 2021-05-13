@@ -1,0 +1,17 @@
+fmod SET is protecting Data .
+sorts SetContract Neset . 
+subsorts Contract < Neset < SetContract .
+op none : -> SetContract [ctor] . *** Empty multiset
+op _ _ : SetContract SetContract -> SetContract [ctor assoc comm id: none] .
+op _ _ : Neset Neset -> Neset [ctor assoc comm id: none] .
+op delete : Contract SetContract -> SetContract . *** Remove ONE occurrence
+op _in_ : Contract SetContract -> Bool . *** Is element in multiset?
+var I : Contract . var MS : SetContract .
+eq delete(I, (I MS)) = delete(I,MS) .
+ceq delete(I, MS) = MS [owise] .
+eq I in (I MS) = true .
+eq I in S = false [owise] .
+op insert : Contract SetContract -> SetContract .
+eq insert(I, MS) = I MS .
+
+endfm

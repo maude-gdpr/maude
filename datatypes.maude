@@ -1,0 +1,107 @@
+*** This will be the library of Creol's functional datatypes
+
+fmod DATA is
+pr QID .
+pr STRING .
+pr INT .
+pr NAT .
+pr FLOAT .
+
+                                   *** Qid = local variable ident
+sorts   Aid Oid GData Expr Contract PolicyId SenData  Data Key Pair MsgId .         *** Aid = attribute identifier, Data is not sensitive data, SenData is sensitive data
+subsort Data < GData .
+subsort SenData < GData .
+subsort Oid < Data .        *** Oid = object identifier
+subsort MsgId < Data .
+subsort GData < Expr .
+subsort Qid < Aid < Expr .
+subsort Contract PolicyId  < Data .
+subsort Key < Aid .
+***subsort Key < Data .
+
+
+
+sorts   EmpList AidList ExprList DataList OidList PlList EmpListn .
+subsort Aid < AidList < ExprList .
+subsort Oid < OidList  .
+subsort PolicyId < PlList  .
+subsort EmpListn < OidList PlList .
+subsort Expr < ExprList .
+subsort GData < DataList  < ExprList .
+subsort EmpList < DataList AidList .
+
+op nothing  :                    -> Data [ctor] .
+op noUser  :                     -> Data [ctor] .
+op User    :                    -> Oid [ctor] .
+op Trace    :                    -> Oid [ctor] .
+op emp  :                     -> EmpList [ctor] .
+op _,,_ : ExprList  ExprList  -> ExprList [ctor assoc id: emp prec 25] .
+op _,,_ : DataList  DataList  -> DataList [ctor ditto] .
+op _,,_ : EmpList   EmpList   -> EmpList [ctor ditto] .
+***op _,,_ : NeExprList ExprList -> NeExprList [ctor ditto] .
+***op _,,_ : ExprList NeExprList -> NeExprList [ctor ditto] .
+***op contract(_,_) : Data Expr -> Contract .
+op noAid : -> AidList .
+op _,,_  : AidList AidList -> AidList [ctor ditto] .
+op _,,,_  : OidList OidList -> OidList [ctor ] .
+op _,,,_  : PlList PlList -> PlList [ctor ] .
+op _,,,_ : EmpListn  EmpListn   -> EmpListn [ctor ] .
+op empn  :                     -> EmpListn [ctor] .
+
+eq noAid = emp . *** if ok may remove noAid !
+
+op _[[[_]]] : Qid ExprList -> Expr . *** function application
+op _[[[_]]] : Qid DataList -> Data . *** function application
+
+*** Basic conversion of data types into sort Data
+op null    :           -> Data [ctor] . *** undef. value/none pointer
+op ob      : Qid       -> Oid  [ctor] .
+op k       : Qid String -> Key [ctor] .
+op n       : Nat Oid       -> MsgId [ctor] .
+op aid     : Key        -> Aid [ctor] .
+op policy      : Nat       -> PolicyId  [ctor] .
+op int(_)  : Int       -> Data [ctor format(o o ! o o)] . 
+op float(_): Float     -> Data [ctor format(o o ! o o)] . 
+op str(_)  : String    -> Data [ctor format(o o ! o o)] .
+***op str(_)  : Qid    -> Data [ctor format(o o ! o o)] .
+op bool(_) : Bool      -> Data [ctor format(o o ! o o)] .
+op sensitive(_,_)   : Data PolicyId -> SenData .
+op contract(_,_)   : Data Oid -> Contract .
+op <_,,_>   : PolicyId Contract -> Pair .
+op _app_   : Data Data -> Data .
+op isnothing   : DataList -> Bool .
+
+
+*** Reconversion for evaluation
+op _asInt             : GData -> Int .
+op _asNat             : GData -> Nat .
+op _asBool            : GData -> Bool .
+op _asStr             : GData -> String .
+ 
+
+var N : Nat .    var I : Int .
+var B : Bool .   vars S  S' : String . vars Q Q' : Qid .
+var O : Oid .
+
+eq int(I)  asInt      = I . 
+eq int(N)  asNat      = N .  *** otherwise error, i.e. irreducible...
+eq bool(B) asBool     = B .
+eq str(S)  asStr      = S .
+
+***op pair : Expr Expr    -> Expr .        *** pairs
+***op pair : GData GData    -> GData [ctor] . *** pairs
+ops _cat_  	  : Expr Expr -> Expr .
+
+ var DL : DataList .
+vars D D'     : GData .
+vars E E'     : Expr .
+vars L L' L'' : ExprList .
+***eq 'fst[[[pair(E, E')]]]   = E . 
+***eq 'scd[[[pair(E, E')]]]   = E' .
+eq E cat E'      = 'plus [[[E ,, E']]].
+eq 'plus  [[[str(S),, str(S')]]]    = str(S + S') .
+eq isnothing(D ,, DL) = ((D == nothing) or (D == null))or isnothing(DL)  .
+***eq isnothing(D,, emp)= ((D == nothing) or (D == null)) .
+***eq isnothing(D)= ((D == nothing) or (D == null)) .
+eq isnothing(emp)= false .
+endfm
