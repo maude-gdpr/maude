@@ -1,0 +1,208 @@
+mod MODEL-CHECK-GDPR is protecting INTERPRETER .
+ protecting PROGRAM .
+including MODEL-CHECKER .
+subsort Configuration < State .
+sort Staten .
+subsort NConfiguration < State .
+
+op compliant : -> Prop [ctor] .
+op noUse : -> Prop [ctor] .
+op expired : PolicyId -> Prop [ctor] .
+op _complyTo_ : PolicyId Contract -> Prop .
+op errorU(_,_) : Oid Contract -> Prop [ctor] .
+op errorC(_,_) : Oid Contract -> Prop [ctor] .
+op _use_for_  : Oid GData  Contract -> Prop .
+op _checked-v-scope(_,_) :  Oid PolicyId Contract -> Prop .
+op ok : -> Prop .
+op error : -> Prop .
+op tickk     : -> Prop .
+op reqDel(_,_)    : PolicyId Oid -> Prop .
+op log-user(_) : Oid -> Prop .
+op collect(_,_,_) : PolicyId Contract Oid -> Prop .
+op optedIn(_,_)   :  Contract PolicyId  -> Prop .
+op optedOut(_,_)   :  Contract PolicyId  -> Prop .
+op done : -> Prop .
+op noExecIn(_) : Oid -> Prop .
+op dbDel(_) :  PolicyId -> Prop .
+op deleted(_) : PolicyId -> Prop .
+op _|=_   : State Prop -> Bool [frozen] .
+op sat(_,_,_) : Subst ExprList GData -> Bool .
+op contract(_) : Object -> Contract .
+
+
+var D D' U : Data . vars PL PL' : PolicyId .  var N F N' : Nat . var B : Bool . var CnSet CnSet' : SetCn .
+var Policy : Policy . vars Ncfg Ncfg' : NConfiguration . var Cn Cn' : Contract . vars O O' O'' : Oid . vars S S' L' L : Subst .
+var DB DB' : Subst . var Process : Process . var SL SL' SL'' : StmList . var C C' : Cid . var V V' : Scope . var NsD NsD' : Data . vars GD GD' : GData . var K : Key . vars Q Q' : Qid . var A A' A'' : Aid . var E : Expr . var EL EL' : ExprList . var M : Qid . var History : History . var Body : Body . var ST : Stm . var P P' : Process . var Pair : Pair . var SD : SenData . var Ev : Event . var formula : Formula . var AL : AidList . vars OL OL' : OidList . vars PlL PlL' : PlList .
+var prop : Prop .
+
+
+eq  { Ncfg PL < U, CnSet', CnSet, B, N > }  |= expired(PL) = false .
+eq  { Ncfg }  |= expired(PL) = true [owise] .
+eq  < O' : C | Att: S, Pr: (L, (SL @ V)), Lcnt: N, Db: DB >   |= log-user(O) = dom('user, L) and (O == O') .
+
+
+**************************
+op inDatabase(_,_) : PolicyId Subst -> Bool .
+op dbDelAll(_,_)     : Configuration PolicyId -> Bool .
+eq inDatabase(PL, ((A |-> sensitive( NsD, PL')), S)) = if PL == PL' then true else inDatabase(PL, S) fi .
+eq inDatabase(PL, noSub) = false .
+eq inDatabase(PL, ((A |-> NsD), S)) = inDatabase(PL, S) .
+
+eq { Ncfg  } |= dbDel(PL) = dbDelAll({ Ncfg  }, PL) .
+eq dbDelAll({ Ncfg < O : C | Att: S, Pr: P, Lcnt: N, Db: DB > }, PL) = (inDatabase(PL, DB) == false) and  dbDelAll({ Ncfg }, PL) .
+eq dbDelAll({ Ncfg }, PL) = true [owise] .
+**************************
+ceq  { Ncfg < O : C | Att: S, Pr: (L, ((collect(D, A', A'', A)) ; SL) @ V) , Lcnt: N, Db: DB > }  |= collect(PL, Cn, O) = true
+if (Cn ==   eval(A',  (S # L))) and (PL ==  eval(A'', (S # L)))  .
+ceq  { Ncfg < O : C | Att: S, Pr: (L, (( collect(D, A', A'', A) ) ; SL) @ V) , Lcnt: N, Db: DB > }  |= collect(PL, Cn, O) = false
+if (Cn =/=   eval(A',  (S # L))) or (PL =/=  eval(A'', (S # L)))  .
+**************
+eq  { Ncfg (PL < U, CnSet', CnSet, B, N >) } |=  PL complyTo Cn = (Cn in union(CnSet', CnSet))   .
+eq  { Ncfg } |=  PL complyTo Cn = false   .
+eq  { Ncfg < O : C | Att: S, Pr: (L, (SL @ V)), Lcnt: N, Db: DB > }  |= O checked-v-scope( PL, Cn) = ((< PL,, Cn >) in V)  .
+****************
+eq { Ncfg  < O : C | Att: S, Pr: errorU(Cn), Lcnt: N, Db: DB > }  |= errorU(O, Cn) = true .
+eq { Ncfg  < O : C | Att: S, Pr: errorC(Cn), Lcnt: N, Db: DB > }  |= errorC(O, Cn) = true .
+***************
+eq sat(L, E,  GD) = if (eval(E, L) == GD) then true else false fi .
+eq sat(L, emp,  GD) = false .
+eq sat(L, (E,, EL),  GD) = if (sat(L, E,  GD)) then true else sat(L, EL,  GD) fi .
+ceq { Ncfg  (< O : C | Att: S, Pr: (L, (((A ::= E); SL) @ V)), Lcnt: N, Db: DB >) }  |= O use GD for Cn = true
+if (sat((S # L), E, GD) and (Cn == eval('myContract, S))) == true  .
+ceq { Ncfg  (< O : C | Att: S, Pr: (L, (((A ::= E); SL) @ V)), Lcnt: N, Db: DB >) }  |= O use GD for Cn = false
+if (sat((S # L), E, GD) and (Cn == eval('myContract, S))) == false  .
+ceq { Ncfg (< O : C | Att: S, Pr: (L, (((return (E)); SL) @ V)), Lcnt: N, Db: DB >) }  |= O use  GD for Cn = true
+if (sat((S # L), E, GD) and (Cn ==  eval('cnCaller, L))) == true .
+ceq { Ncfg (< O : C | Att: S, Pr: (L, (((return (E)); SL) @ V)), Lcnt: N, Db: DB >) }  |= O use  GD for Cn = false
+if (sat((S # L), E, GD) and (Cn ==  eval('cnCaller, L))) == false .
+
+eq { Ncfg (< O'' : C | Att: S, Pr: (L, (((AL ::= E . M(EL)); SL) @ V)), Lcnt: N, Db: DB > < O' : C' | Att: S', Pr: P', Lcnt: N', Db: DB' >) } |= O use  GD for Cn = O'' == O and (sat((S # L), EL, GD) and (eval(E, (S # L)) == O') and (Cn == eval('myContract, S')))  .
+eq { Ncfg  (< O : C | Att: S, Pr: (L, ((freeze(SL') ; SL) @ V)) , Lcnt: N, Db: DB >) }  |= O use GD for Cn = false .
+eq { Ncfg  (< O : C | Att: S, Pr: P, Lcnt: N, Db: DB >) }  |= O use GD for Cn = false [owise] .
+******************
+op extract(_) : SenData -> PolicyId .
+eq extract( sensitive( NsD, PL)) = PL .
+op purposeLimitation(_,_,_) : Oid GData Contract -> Formula .
+op purposeLimitation1(_,_,_) : Oid GData Contract -> Formula .
+op purposeLimitation2(_,_,_) : Oid GData Contract -> Formula .
+op purposeLimitationconf(_,_,_) : Configuration GData Contract -> Formula .
+eq purposeLimitation1(O , sensitive(NsD, PL), Cn) =  (([]  ((O use  sensitive( NsD, PL) for Cn) ->   (O checked-v-scope(PL, Cn)))) -> [] ~ errorU(O, Cn)) .
+eq purposeLimitationconf({ Ncfg (< O : C | Att: S, Pr: Process, Lcnt: N, Db: DB > ) }, sensitive( NsD, PL), Cn ) = fairness({ Ncfg (< O : C | Att: S, Pr: Process, Lcnt: N, Db: DB > ) }) -> (purposeLimitation2(O , sensitive( NsD, PL), Cn)  /\ purposeLimitation1(O , sensitive( NsD, PL ), Cn) /\ purposeLimitationconf({ Ncfg }, sensitive( NsD, PL), Cn)) .
+eq purposeLimitation2(O , sensitive(NsD, PL), Cn) = [] ((O use  sensitive(NsD, PL) for Cn /\ ~ O checked-v-scope(PL, Cn) /\ ~ PL complyTo Cn) -> O ( noExecIn(O) U (errorU(O, Cn) \/ optedIn(Cn, PL)))) .
+
+eq purposeLimitationconf({ Ncfg }, NsD, Cn ) = True .
+eq purposeLimitationconf({ Ncfg } , sensitive( NsD, PL), Cn ) =  True [owise] .
+***op purposeLimit1(_,_,_) : OidList GData Contract -> Formula .
+***eq purposeLimit1(empn, GD, Cn) = True .
+***eq purposeLimit1(O, GD, Cn) = purposeLimitation1(O, GD, Cn) .
+***eq purposeLimit1((OL ,,, OL'), GD, Cn) = purposeLimit1(OL, GD, Cn) /\ purposeLimit1(OL', GD, Cn) .
+
+***op purposeLimit2(_,_,_) : OidList GData Contract -> Formula .
+***eq purposeLimit2(empn, GD, Cn) = True .
+***eq purposeLimit2(O, GD, Cn) = purposeLimitation2(O, GD, Cn) .
+***eq purposeLimit2((OL ,,, OL'), GD, Cn) = purposeLimit2(OL, GD, Cn) /\ purposeLimit2(OL', GD, Cn) .
+**********************************
+op consent1(_,_,_) : PolicyId Contract Oid -> Formula .
+eq consent1(PL, Cn, O) = ([] (collect(PL, Cn, O) ->  O checked-v-scope(PL, Cn))) ->  [] ~ errorC(O, Cn) .
+op consent2(_,_,_) : PolicyId Contract Oid -> Formula .
+eq consent2(PL, Cn, O) = []( ((collect(PL, Cn, O) /\  ~ O checked-v-scope(PL, Cn) /\ ~ PL complyTo Cn)  -> O (( noExecIn(O) U (errorC(O, Cn) \/ optedIn(Cn, PL)))))) .
+op consentconf(_,_,_) : Configuration PolicyId Contract  -> Formula .
+eq consentconf({ Ncfg (< O : C | Att: S, Pr: Process, Lcnt: N, Db: DB > ) },  PL, Cn ) =  fairness({ Ncfg (< O : C | Att: S, Pr: Process, Lcnt: N, Db: DB > ) }) -> (consent2( PL, Cn, O) /\  consent1( PL, Cn, O) /\ consentconf({ Ncfg }, PL, Cn )) .
+eq consentconf({ Ncfg } , PL, Cn ) =  True .
+**************
+op storageLimitationconf(_,_) : Configuration PolicyId  -> Formula .
+eq storageLimitationconf({ Ncfg  },  PL) =  fairness({ Ncfg  }) -> []( ( expired(PL)  ->  dbDel( PL) ) ) .
+************************************
+op withdraw(_,_,_) : Configuration Contract PolicyId -> Formula .
+eq withdraw({ Ncfg  }, Cn, PL) = fairness({ Ncfg }) -> [] (optedOut(Cn, PL) -> ( ~ (PL complyTo Cn) W optedIn(Cn, PL))) .
+******************************************************
+op forget(_,_) : Configuration  PolicyId -> Formula .
+eq forget({ Ncfg  }, PL) = fairness({ Ncfg  }) -> [] (deleted( PL) ->  expired(PL)) .
+******************************************************
+eq   { Ncfg ruleLabel(O', Ev) }  |= noExecIn(O) = (O =/= O') .
+
+eq { Ncfg ruleLabel(O, deleteEv(PL')) }  |= deleted( PL) = (PL' == PL ) and (O == User) .
+eq  { Ncfg (PL' < U, CnSet', CnSet, B, N >) ruleLabel(O, optInEv( PL')) } |=  optedIn(Cn, PL) =  (PL == PL') and ((Cn in CnSet) == true)  .
+eq  { Ncfg (PL' < U, CnSet', CnSet, B, N >) ruleLabel(O, optOutEv( PL')) } |=  optedOut(Cn, PL) = (PL == PL') and ((Cn in CnSet) == false)  .
+eq  { Ncfg  } |=  optedIn(Cn, PL) =  false  [owise] .
+eq  { Ncfg } |=  optedOut(Cn, PL) = false  [owise] .
+
+
+
+
+op enAssign(_) : Oid -> Prop .
+op exAssign(_) : Oid -> Prop .
+eq { Ncfg  (< O : C | Att: S, Pr: (L, (((A ::= E); SL) @ V)), Lcnt: N, Db: DB >) } |= enAssign(O) = true .
+eq { Ncfg ruleLabel(O', Ev) } |= exAssign(O) = (O == O') and ((Ev == assignEv) or  (Ev == assignEv1)) .
+
+op enCall(_) : Oid -> Prop .
+op exCall(_) : Oid -> Prop .
+eq { Ncfg < O : C | Att: S, Pr: (L, (((AL ::= E . M(EL)); SL) @ V)), Lcnt: N, Db: DB > } |= enCall(O) = true .
+eq { Ncfg ruleLabel(O', Ev) } |= exCall(O) = (O == O') and (Ev == callEv) .
+
+op enReturn(_) : Oid -> Prop .
+op exReturn(_) : Oid -> Prop .
+eq { Ncfg < O : C | Att: S, Pr: (L, (((return (E)); SL) @ V)), Lcnt: N, Db: DB > }  |= enReturn(O) = true .
+eq { Ncfg ruleLabel(O', Ev) } |= exReturn(O) = (O == O') and (Ev == returnEv) .
+
+op enCollect(_) : Oid -> Prop .
+op exCollect(_) : Oid -> Prop .
+eq { Ncfg < O : C | Att: S, Pr: (L, ((collect(D, A', A'', A)) ; SL) @ V) , Lcnt: N, Db: DB > }   |= enCollect(O) = true .
+eq { Ncfg ruleLabel(O', Ev) } |= exCollect(O) = (O == O') and (Ev == collectEv) .
+
+op enTick :  -> Prop .
+op exTick :  -> Prop .
+eq { Ncfg }   |= enTick = true .
+eq { Ncfg ruleLabel(O, Ev) } |= exTick = (O == ticking) and (Ev == tickEv) .
+
+
+op enOptOut(_) :  PolicyId -> Prop .
+op exOptOut(_) :  PolicyId -> Prop .
+eq { Ncfg   (PL' < U, CnSet', (CnSet), B, N >) } |= enOptOut(PL) = (PL == PL') .
+eq { Ncfg ruleLabel(O, Ev) } |= exOptOut( PL) = (O == User) and (Ev == optOutEv( PL)) .
+
+op enDelete(_) : PolicyId -> Prop .
+op exDelete(_) : PolicyId -> Prop .
+eq { Ncfg   (PL' < U, CnSet', CnSet, B, N >) } |= enDelete(PL) = (PL == PL') .
+eq { Ncfg ruleLabel(O, Ev) } |= exDelete(PL) = (O == User) and (Ev == deleteEv(PL)) .
+
+op enOther(_) : Oid -> Prop .
+op exOther(_) : Oid  -> Prop .
+eq { Ncfg  < O : C | Att: S, Pr: (L, (SL @ V)), Lcnt: N, Db: DB > } |= enOther(O) = true .
+eq { Ncfg ruleLabel(O', Ev) } |= exOther(O) = (Ev == otherEv) and (O == O') .
+
+var Prp : Prop .
+eq { Ncfg } |= Prp = false [owise] .
+
+op objectFair(_) : Oid -> Formula .
+op tickFair : -> Prop .
+op policyFair(_) : PolicyId -> Formula .
+eq objectFair(O) = ([] <> enAssign(O) -> ( [] <>  exAssign(O))) /\ ([] <> enCall(O) -> ( [] <>  exCall(O)))  /\ ([] <> enReturn(O) -> ([] <>  exReturn(O)))  /\ ([] <> enCollect(O) -> ([] <>  exCollect(O))) .
+eq tickFair = [] <> enTick -> [] <>  exTick .
+***eq { Ncfg } |= tickFair = true . 
+eq policyFair(PL) =  ([] <> enOptOut(PL) -> [] <>  exOptOut(PL)) /\ ([] <> enDelete(PL) -> [] <>  exDelete(PL)) .
+
+op fairness(_) : Configuration -> Formula .
+
+op oids(_) : Configuration -> OidList .
+eq oids(noConf) = empn .
+eq oids( < O : C | Att: S, Pr: Process, Lcnt: N, Db: DB > Ncfg) = ((O ,,, oids(Ncfg))) .
+eq oids(  Ncfg) = empn [owise] .
+
+op objectlistFair(_) : OidList -> Formula .
+eq objectlistFair(empn) = True .
+eq objectlistFair(O) = objectFair(O) .
+eq objectlistFair((OL ,,, OL')) = objectlistFair(OL) /\ objectlistFair(OL') .
+
+op pls(_) : Configuration -> PlList .
+eq pls(noConf) = empn .
+eq pls( (PL < U, CnSet', CnSet, B, N >) Ncfg) = ((PL ,,, pls(Ncfg))) .
+eq pls(  Ncfg) = empn [owise] .
+
+op policylistFair(_) : PlList -> Formula .
+eq policylistFair(empn) = True .
+eq policylistFair(PL) = policyFair(PL) .
+eq policylistFair((PlL ,,, PlL')) = policylistFair(PlL) /\ policylistFair(PlL') .
+
+eq fairness({ Ncfg }) = [](  ( objectlistFair(oids(Ncfg)) /\ policylistFair(pls(Ncfg))  )) .
+endm
