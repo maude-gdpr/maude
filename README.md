@@ -6,7 +6,7 @@
 
 * Prerequisites
 
-  To run and test the code, the rewriting tool [[http://maude.cs.illinois.edu/][Maude version 3.1]] is needed. It's
+  To run and test the code, the rewriting tool [[http://maude.cs.illinois.edu/http://maude.cs.illinois.edu/w/index.php/Maude_download_and_installation]] (Maude version 3.1 is needed). It's
   downloadable free of charge from the University of Illinois. See the
   documentation there for installation instructions and further information.
 
